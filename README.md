@@ -94,12 +94,18 @@ agenthub-infra/
 ### Frontend
 - [agenthub-frontend](https://github.com/AgentHub-Studio/agenthub-frontend) - Angular application
 
-### Infraestrutura
+### Infraestrutura & Suporte
 - [agenthub-postgresql](https://github.com/AgentHub-Studio/agenthub-postgresql) - PostgreSQL
 - [agenthub-keycloak](https://github.com/AgentHub-Studio/agenthub-keycloak) - Keycloak
 - [agenthub-minio](https://github.com/AgentHub-Studio/agenthub-minio) - MinIO
 - [agenthub-nginx](https://github.com/AgentHub-Studio/agenthub-nginx) - Nginx
 - [agenthub-ollama](https://github.com/AgentHub-Studio/agenthub-ollama) - Ollama
+- [agenthub-embedding](https://github.com/AgentHub-Studio/agenthub-embedding) - Embedding service
+- [agenthub-embedding-job](https://github.com/AgentHub-Studio/agenthub-embedding-job) - Embedding job (Go)
+- [agenthub-extractor](https://github.com/AgentHub-Studio/agenthub-extractor) - Document extractor
+- [agenthub-graph-generator](https://github.com/AgentHub-Studio/agenthub-graph-generator) - Graph generator
+- [agenthub-vpn-proxy](https://github.com/AgentHub-Studio/agenthub-vpn-proxy) - VPN proxy (Go)
+- [agenthub-cloudflare](https://github.com/AgentHub-Studio/agenthub-cloudflare) - Cloudflare integration
 
 ## 🤝 Contribuindo
 
