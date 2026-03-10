@@ -1,0 +1,396 @@
+# Network compartilhada existente
+networks:
+  agenthub-shared-net:
+    external: true
+
+# Volumes
+volumes:
+  postgres_data:
+  minio_data:
+  ollama_data:
+
+services:
+  # ==========================================
+  # INFRA - Profile: minimal, backend, full
+  # ==========================================
+  
+  postgres:
+    profiles: ["minimal", "backend", "full", "edge"]
+    image: postgres:15
+    container_name: agenthub-postgres
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agenthub}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../docs/spec/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  keycloak:
+    profiles: ["minimal", "backend", "full", "edge"]
+    image: quay.io/keycloak/keycloak:latest
+    container_name: agenthub-keycloak
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      KC_DB_USERNAME: ${POSTGRES_USER:-postgres}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  minio:
+    profiles: ["minimal", "backend", "full", "edge"]
+    image: minio/minio:latest
+    container_name: agenthub-minio
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  ollama:
+    profiles: ["minimal", "backend", "full", "edge"]
+    image: ollama/ollama:latest
+    container_name: agenthub-ollama
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  rabbitmq:
+    profiles: ["minimal", "backend", "full", "edge"]
+    image: rabbitmq:3-management
+    container_name: agenthub-rabbitmq
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    restart: unless-stopped
+
+  # ==========================================
+  # BACKEND - Profile: backend, full
+  # ==========================================
+
+  backend:
+    profiles: ["backend", "full", "edge"]
+    build:
+      context: ../agenthub-backend
+      dockerfile: Dockerfile
+    container_name: agenthub-backend
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      KEYCLOAK_URL: http://keycloak:8080
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    profiles: ["backend", "full", "edge"]
+    build:
+      context: ../agenthub-frontend
+      dockerfile: Dockerfile
+    container_name: agenthub-frontend
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "4200:80"
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8081/api/v1}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # ORCHESTRATOR - Profile: full
+  # ==========================================
+
+  orchestrator:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-orchestrator
+      dockerfile: Dockerfile
+    container_name: agenthub-orchestrator
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      BACKEND_URL: http://backend:8081
+      SKILL_RUNTIME_URL: http://skill-runtime:8083
+      OLLAMA_URL: http://ollama:11434
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - backend
+      - rabbitmq
+      - ollama
+    restart: unless-stopped
+
+  skill-runtime:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-skill-runtime
+      dockerfile: Dockerfile
+    container_name: agenthub-skill-runtime
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      BACKEND_URL: http://backend:8081
+      MCP_CLIENT_URL: http://mcp-client:9001
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      - backend
+      - postgres
+    restart: unless-stopped
+
+  observability:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-observability
+      dockerfile: Dockerfile
+    container_name: agenthub-observability
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8084:8084"
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  package-registry:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-package-registry
+      dockerfile: Dockerfile
+    container_name: agenthub-package-registry
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8085:8085"
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    depends_on:
+      - postgres
+      - minio
+    restart: unless-stopped
+
+  marketplace:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-marketplace
+      dockerfile: Dockerfile
+    container_name: agenthub-marketplace
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8086:8086"
+    environment:
+      SERVER_PORT: 8086
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      - postgres
+      - package-registry
+    restart: unless-stopped
+
+  # ==========================================
+  # MCP - Profile: full
+  # ==========================================
+
+  mcp-client:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-mcp-client-runtime
+      dockerfile: Dockerfile
+    container_name: agenthub-mcp-client
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "9001:9001"
+    environment:
+      PORT: 9001
+    restart: unless-stopped
+
+  mcp-server:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-mcp-server-runtime
+      dockerfile: Dockerfile
+    container_name: agenthub-mcp-server
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "9002:9002"
+    environment:
+      PORT: 9002
+      BACKEND_URL: http://backend:8081
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # SUPPORT SERVICES - Profile: full
+  # ==========================================
+
+  embedding:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-embedding
+      dockerfile: Dockerfile
+    container_name: agenthub-embedding
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+
+  embedding-job:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-embedding-job
+      dockerfile: Dockerfile
+    container_name: agenthub-embedding-job
+    networks:
+      - agenthub-shared-net
+    environment:
+      POSTGRES_URL: postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
+  extractor:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-extractor
+      dockerfile: Dockerfile
+    container_name: agenthub-extractor
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8091:8091"
+    restart: unless-stopped
+
+  graph-generator:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-graph-generator
+      dockerfile: Dockerfile
+    container_name: agenthub-graph-generator
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "8092:8092"
+    restart: unless-stopped
+
+  # ==========================================
+  # EDGE - Profile: edge, full (Nginx + Cloudflare)
+  # ==========================================
+
+  nginx:
+    profiles: ["edge"]
+    build:
+      context: ../agenthub-nginx
+      dockerfile: Dockerfile
+    container_name: agenthub-nginx
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  cloudflare:
+    profiles: ["edge"]
+    build:
+      context: ../agenthub-cloudflare
+      dockerfile: Dockerfile
+    container_name: agenthub-cloudflare
+    networks:
+      - agenthub-shared-net
+    environment:
+      CLOUDFLARE_TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped

@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# AgentHub Infrastructure - Start Services
+# Usage: ./scripts/start [profile]
+# Profiles: minimal, backend, full, edge
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Default profile
+PROFILE="${1:-minimal}"
+
+# Validate profile
+case "$PROFILE" in
+    minimal|backend|full|edge)
+        ;;
+    *)
+        echo -e "${RED}Error: Invalid profile '${PROFILE}'${NC}"
+        echo ""
+        echo "Usage: $0 [profile]"
+        echo ""
+        echo "Available profiles:"
+        echo "  minimal  - Infrastructure only (postgres, keycloak, minio, ollama, rabbitmq)"
+        echo "  backend  - Infrastructure + backend + frontend"
+        echo "  full     - All services (21 containers)"
+        echo "  edge     - Full + nginx + cloudflare tunnel"
+        echo ""
+        exit 1
+        ;;
+esac
+
+cd "$PROJECT_ROOT"
+
+# Check if .env exists
+if [ ! -f .env ]; then
+    echo -e "${YELLOW}Warning: .env file not found${NC}"
+    echo "Creating .env from .env.example..."
+    cp .env.example .env
+    echo -e "${YELLOW}Please edit .env and update the values before continuing${NC}"
+    exit 1
+fi
+
+# Check if network exists
+if ! docker network inspect agenthub-shared-net >/dev/null 2>&1; then
+    echo -e "${BLUE}Creating Docker network: agenthub-shared-net${NC}"
+    docker network create agenthub-shared-net
+fi
+
+echo -e "${GREEN}Starting AgentHub with profile: ${PROFILE}${NC}"
+echo ""
+
+# Start services
+docker compose --profile "$PROFILE" up -d
+
+echo ""
+echo -e "${GREEN}Services started successfully!${NC}"
+echo ""
+echo "To view logs:"
+echo "  ./scripts/logs [service]"
+echo ""
+echo "To check status:"
+echo "  ./scripts/status"
+echo ""
+echo "To stop services:"
+echo "  ./scripts/stop"
+echo ""
+
+# Show service URLs based on profile
+case "$PROFILE" in
+    minimal)
+        echo "Infrastructure services running:"
+        echo "  PostgreSQL:    localhost:5432"
+        echo "  Keycloak:      http://localhost:8080"
+        echo "  MinIO Console: http://localhost:9001"
+        echo "  MinIO API:     http://localhost:9000"
+        echo "  RabbitMQ Mgmt: http://localhost:15672"
+        echo "  Ollama:        http://localhost:11434"
+        ;;
+    backend)
+        echo "Application services running:"
+        echo "  Frontend:      http://localhost:4200"
+        echo "  Backend API:   http://localhost:8081"
+        echo "  Keycloak:      http://localhost:8080"
+        echo "  MinIO Console: http://localhost:9001"
+        echo "  RabbitMQ Mgmt: http://localhost:15672"
+        ;;
+    full)
+        echo "All services running:"
+        echo "  Frontend:           http://localhost:4200"
+        echo "  Backend API:        http://localhost:8081"
+        echo "  Orchestrator:       http://localhost:8082"
+        echo "  Skill Runtime:      http://localhost:8083"
+        echo "  Package Registry:   http://localhost:8084"
+        echo "  Marketplace:        http://localhost:8085"
+        echo "  Observability:      http://localhost:8086"
+        echo "  MCP Client Runtime: http://localhost:8090"
+        echo "  MCP Server Runtime: http://localhost:8091"
+        echo "  Embedding Service:  http://localhost:8092"
+        echo "  Extractor:          http://localhost:8093"
+        echo "  Graph Generator:    http://localhost:8094"
+        echo "  VPN Proxy:          http://localhost:8095"
+        echo ""
+        echo "Infrastructure:"
+        echo "  Keycloak:      http://localhost:8080"
+        echo "  MinIO Console: http://localhost:9001"
+        echo "  RabbitMQ Mgmt: http://localhost:15672"
+        echo "  Ollama:        http://localhost:11434"
+        ;;
+    edge)
+        echo "All services running with edge exposure:"
+        echo "  Nginx (HTTP):  http://localhost:80"
+        echo "  Nginx (HTTPS): https://localhost:443"
+        echo "  Cloudflare:    Tunnel active"
+        echo ""
+        echo "Application services:"
+        echo "  Frontend:      http://localhost:4200"
+        echo "  Backend API:   http://localhost:8081"
+        echo "  [... all other services ...]"
+        ;;
+esac
+
+echo ""

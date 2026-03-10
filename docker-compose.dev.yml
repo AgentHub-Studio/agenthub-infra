@@ -1,0 +1,104 @@
+# AgentHub Development Override
+# This file enables hot-reload for development
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile backend up
+
+services:
+  # Frontend - Angular hot-reload
+  agenthub-frontend:
+    volumes:
+      - ../agenthub-frontend:/app
+      - /app/node_modules
+    environment:
+      - NG_CLI_ANALYTICS=false
+    command: npm run start -- --host 0.0.0.0 --poll 2000
+
+  # Backend - Spring Boot DevTools hot-reload
+  agenthub-backend:
+    volumes:
+      - ../agenthub-backend:/app
+      - /app/target
+    environment:
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
+
+  # Orchestrator - Spring Boot DevTools hot-reload
+  agenthub-orchestrator:
+    volumes:
+      - ../agenthub-orchestrator:/app
+      - /app/target
+    environment:
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+  # Skill Runtime - Spring Boot DevTools hot-reload
+  agenthub-skill-runtime:
+    volumes:
+      - ../agenthub-skill-runtime:/app
+      - /app/target
+    environment:
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+  # Package Registry - Spring Boot DevTools hot-reload
+  agenthub-package-registry:
+    volumes:
+      - ../agenthub-package-registry:/app
+      - /app/target
+    environment:
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+  # Marketplace - Spring Boot DevTools hot-reload
+  agenthub-marketplace:
+    volumes:
+      - ../agenthub-marketplace:/app
+      - /app/target
+    environment:
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+  # Observability - Spring Boot DevTools hot-reload
+  agenthub-observability:
+    volumes:
+      - ../agenthub-observability:/app
+      - /app/target
+    environment:
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+  # MCP Client Runtime - Go hot-reload with Air
+  agenthub-mcp-client-runtime:
+    volumes:
+      - ../agenthub-mcp-client-runtime:/app
+    command: air -c .air.toml
+
+  # MCP Server Runtime - Go hot-reload with Air
+  agenthub-mcp-server-runtime:
+    volumes:
+      - ../agenthub-mcp-server-runtime:/app
+    command: air -c .air.toml
+
+  # Embedding Service - Go hot-reload with Air
+  agenthub-embedding:
+    volumes:
+      - ../agenthub-embedding:/app
+    command: air -c .air.toml
+
+  # Embedding Job - Go hot-reload with Air
+  agenthub-embedding-job:
+    volumes:
+      - ../agenthub-embedding-job:/app
+    command: air -c .air.toml
+
+  # Extractor - Go hot-reload with Air
+  agenthub-extractor:
+    volumes:
+      - ../agenthub-extractor:/app
+    command: air -c .air.toml
+
+  # Graph Generator - Go hot-reload with Air
+  agenthub-graph-generator:
+    volumes:
+      - ../agenthub-graph-generator:/app
+    command: air -c .air.toml
+
+  # VPN Proxy - Go hot-reload with Air
+  agenthub-vpn-proxy:
+    volumes:
+      - ../agenthub-vpn-proxy:/app
+    command: air -c .air.toml
