@@ -1,4 +1,4 @@
-# Network compartilhada existente
+# Shared external network
 networks:
   agenthub-shared-net:
     external: true
@@ -64,11 +64,11 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
@@ -118,21 +118,21 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8081:8081"
+      - "${BACKEND_PORT:-8081}:8081"
     environment:
       SERVER_PORT: 8081
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
       KEYCLOAK_URL: http://keycloak:8080
       MINIO_URL: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-agenthub}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-changeme_rabbitmq_password}
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,9 +153,9 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "4200:80"
+      - "${FRONTEND_PORT:-4200}:80"
     environment:
-      API_BASE_URL: ${API_BASE_URL:-http://localhost:8081/api/v1}
+      API_BASE_URL: ${FRONTEND_API_URL:-http://localhost:8081}
     depends_on:
       - backend
     restart: unless-stopped
@@ -173,13 +173,16 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8082:8082"
+      - "${ORCHESTRATOR_PORT:-8082}:8082"
     environment:
       SERVER_PORT: 8082
-      BACKEND_URL: http://backend:8081
-      SKILL_RUNTIME_URL: http://skill-runtime:8083
-      OLLAMA_URL: http://ollama:11434
+      BACKEND_URL: http://backend:${BACKEND_PORT:-8081}
+      SKILL_RUNTIME_URL: http://skill-runtime:${SKILL_RUNTIME_PORT:-8083}
+      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-agenthub}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-changeme_rabbitmq_password}
     depends_on:
       - backend
       - rabbitmq
@@ -195,14 +198,15 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8083:8083"
+      - "${SKILL_RUNTIME_PORT:-8083}:8083"
     environment:
       SERVER_PORT: 8083
-      BACKEND_URL: http://backend:8081
-      MCP_CLIENT_URL: http://mcp-client:9001
+      BACKEND_URL: http://backend:${BACKEND_PORT:-8081}
+      MCP_CLIENT_URL: http://mcp-client:${MCP_CLIENT_RUNTIME_PORT:-8090}
+      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
     depends_on:
       - backend
       - postgres
@@ -217,12 +221,12 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8084:8084"
+      - "${OBSERVABILITY_PORT:-8086}:8086"
     environment:
-      SERVER_PORT: 8084
+      SERVER_PORT: 8086
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
     depends_on:
       - postgres
     restart: unless-stopped
@@ -236,15 +240,15 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8085:8085"
+      - "${PACKAGE_REGISTRY_PORT:-8084}:8084"
     environment:
-      SERVER_PORT: 8085
+      SERVER_PORT: 8084
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      MINIO_URL: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
+      MINIO_URL: http://minio:${MINIO_API_PORT:-9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
     depends_on:
       - postgres
       - minio
@@ -259,12 +263,12 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8086:8086"
+      - "${MARKETPLACE_PORT:-8085}:8085"
     environment:
-      SERVER_PORT: 8086
+      SERVER_PORT: 8085
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
     depends_on:
       - postgres
       - package-registry
@@ -283,9 +287,10 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "9001:9001"
+      - "${MCP_CLIENT_RUNTIME_PORT:-8090}:8090"
     environment:
-      PORT: 9001
+      PORT: 8090
+      DB_URL: ${MCP_CLIENT_RUNTIME_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
     restart: unless-stopped
 
   mcp-server:
@@ -297,10 +302,11 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "9002:9002"
+      - "${MCP_SERVER_RUNTIME_PORT:-8091}:8091"
     environment:
-      PORT: 9002
-      BACKEND_URL: http://backend:8081
+      PORT: 8091
+      BACKEND_URL: http://backend:${BACKEND_PORT:-8081}
+      DB_URL: ${MCP_SERVER_RUNTIME_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
     depends_on:
       - backend
     restart: unless-stopped
@@ -318,7 +324,11 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8090:8090"
+      - "${EMBEDDING_PORT:-8092}:8092"
+    environment:
+      PORT: 8092
+      DB_URL: ${EMBEDDING_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
+      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
     restart: unless-stopped
 
   embedding-job:
@@ -330,13 +340,17 @@ services:
     networks:
       - agenthub-shared-net
     environment:
-      POSTGRES_URL: postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_URL: ${EMBEDDING_JOB_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
+      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
+      EMBEDDING_SERVICE_URL: http://embedding:${EMBEDDING_PORT:-8092}
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-agenthub}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-changeme_rabbitmq_password}
     depends_on:
       - postgres
       - rabbitmq
+      - embedding
     restart: unless-stopped
 
   extractor:
@@ -348,7 +362,13 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8091:8091"
+      - "${EXTRACTOR_PORT:-8093}:8093"
+    environment:
+      PORT: 8093
+      DB_URL: ${EXTRACTOR_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
+      MINIO_URL: http://minio:${MINIO_API_PORT:-9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
     restart: unless-stopped
 
   graph-generator:
@@ -360,11 +380,30 @@ services:
     networks:
       - agenthub-shared-net
     ports:
-      - "8092:8092"
+      - "${GRAPH_GENERATOR_PORT:-8094}:8094"
+    environment:
+      PORT: 8094
+      DB_URL: ${GRAPH_GENERATOR_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
+      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
+    restart: unless-stopped
+
+  vpn-proxy:
+    profiles: ["full"]
+    build:
+      context: ../agenthub-vpn-proxy
+      dockerfile: Dockerfile
+    container_name: agenthub-vpn-proxy
+    networks:
+      - agenthub-shared-net
+    ports:
+      - "${VPN_PROXY_PORT:-8095}:8095"
+    environment:
+      PORT: 8095
+      DB_URL: ${VPN_PROXY_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
     restart: unless-stopped
 
   # ==========================================
-  # EDGE - Profile: edge, full (Nginx + Cloudflare)
+  # EDGE - Profile: edge (Nginx + Cloudflare)
   # ==========================================
 
   nginx:
