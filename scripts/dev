@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# AgentHub Infrastructure - Run individual dev service
+# Usage: ./scripts/dev <service>
+# Services: backend, orchestrator, skill-runtime, package-registry,
+#           marketplace, observability, mcp-client, mcp-server, frontend
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+SERVICE="${1:-}"
+
+VALID_SERVICES="backend orchestrator skill-runtime package-registry marketplace observability mcp-client mcp-server frontend"
+
+if [ -z "$SERVICE" ]; then
+    echo -e "${RED}Error: service name required${NC}"
+    echo ""
+    echo "Usage: $0 <service>"
+    echo ""
+    echo "Available services:"
+    for s in $VALID_SERVICES; do
+        echo "  $s"
+    done
+    exit 1
+fi
+
+valid=false
+for s in $VALID_SERVICES; do
+    [ "$s" = "$SERVICE" ] && valid=true && break
+done
+
+if [ "$valid" = false ]; then
+    echo -e "${RED}Error: unknown service '${SERVICE}'${NC}"
+    echo "Valid services: $VALID_SERVICES"
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+
+if ! docker network inspect agenthub-shared-net >/dev/null 2>&1; then
+    echo -e "${BLUE}Creating Docker network: agenthub-shared-net${NC}"
+    docker network create agenthub-shared-net
+fi
+
+echo -e "${GREEN}Starting dev service: ${SERVICE}${NC}"
+docker compose -f docker-compose.dev.yml up --force-recreate "$SERVICE"

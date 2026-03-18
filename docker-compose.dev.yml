@@ -1,104 +1,204 @@
-# AgentHub Development Override
-# This file enables hot-reload for development
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile backend up
+# Development compose — runs each service from source using the official runtime image.
+# Variable substitution uses agenthub-infra/.env automatically (same directory).
+#
+# Usage (via JetBrains run configs or CLI):
+#   docker compose -f docker-compose.dev.yml up backend
+#   docker compose -f docker-compose.dev.yml up marketplace
+#   docker compose -f docker-compose.dev.yml up frontend
+
+networks:
+  agenthub-shared-net:
+    external: true
+
+# ===========================================================================
+# JAVA SERVICES — maven:3.9.12-amazoncorretto-25 + spring-boot:run
+# ===========================================================================
+
+x-java-common: &java-common
+  image: maven:3.9.12-amazoncorretto-25
+  working_dir: /app
+  command: mvn spring-boot:run -Dspring-boot.run.profiles=desenvolvimento
+  environment: &java-env
+    MAVEN_OPTS: "-Djava.awt.headless=true --enable-native-access=ALL-UNNAMED"
+    # PostgreSQL
+    SPRING_R2DBC_URL: r2dbc:postgresql://postgres.internal:5432/${POSTGRES_DB:-agenthub}
+    SPRING_R2DBC_USERNAME: ${POSTGRES_USER:-postgres}
+    SPRING_R2DBC_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres.internal:5432/${POSTGRES_DB:-agenthub}
+    SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+    SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    # RabbitMQ
+    SPRING_RABBITMQ_HOST: rabbitmq.internal
+    SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+    SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+    # Keycloak
+    AGENTHUB_KEYCLOAK_BASE__URL: http://keycloak.internal:8080
+    AGENTHUB_KEYCLOAK_ADMIN__USERNAME: ${KEYCLOAK_ADMIN:-admin}
+    AGENTHUB_KEYCLOAK_ADMIN__PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
 
 services:
-  # Frontend - Angular hot-reload
-  agenthub-frontend:
+
+  backend:
+    <<: *java-common
+    container_name: agenthub-backend
+    volumes:
+      - ../agenthub-backend:/app
+      - ~/.m2:/root/.m2
+    environment:
+      <<: *java-env
+      AGENTHUB_STORAGE_S3_ENDPOINT: http://minio.internal:9000
+      AGENTHUB_STORAGE_S3_ACCESS__KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AGENTHUB_STORAGE_S3_SECRET__KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.backend.internal
+    ports:
+      - "8081:8081"
+
+  orchestrator:
+    <<: *java-common
+    container_name: agenthub-orchestrator
+    volumes:
+      - ../agenthub-orchestrator:/app
+      - ~/.m2:/root/.m2
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.orchestrator.internal
+    ports:
+      - "8082:8082"
+
+  skill-runtime:
+    <<: *java-common
+    container_name: agenthub-skill-runtime
+    volumes:
+      - ../agenthub-skill-runtime:/app
+      - ~/.m2:/root/.m2
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.skill-runtime.internal
+    ports:
+      - "8083:8083"
+
+  package-registry:
+    <<: *java-common
+    container_name: agenthub-package-registry
+    volumes:
+      - ../agenthub-package-registry:/app
+      - ~/.m2:/root/.m2
+    environment:
+      <<: *java-env
+      AGENTHUB_STORAGE_S3_ENDPOINT: http://minio.internal:9000
+      AGENTHUB_STORAGE_S3_ACCESS__KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AGENTHUB_STORAGE_S3_SECRET__KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.package-registry.internal
+    ports:
+      - "8084:8084"
+
+  marketplace:
+    <<: *java-common
+    container_name: agenthub-marketplace
+    volumes:
+      - ../agenthub-marketplace:/app
+      - ~/.m2:/root/.m2
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.marketplace.internal
+    ports:
+      - "8085:8085"
+
+  observability:
+    <<: *java-common
+    container_name: agenthub-observability
+    volumes:
+      - ../agenthub-observability:/app
+      - ~/.m2:/root/.m2
+    environment:
+      <<: *java-env
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse.internal:8123/agenthub
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.observability.internal
+    ports:
+      - "8086:8086"
+
+  # ===========================================================================
+  # GO SERVICES — golang:1.24 + go run
+  # ===========================================================================
+
+  mcp-client:
+    image: golang:1.24
+    container_name: agenthub-mcp-client
+    working_dir: /app
+    command: go run ./cmd/server
+    volumes:
+      - ../agenthub-mcp-client-runtime:/app
+      - ~/.go/pkg/mod:/go/pkg/mod
+    environment:
+      PORT: "8090"
+      GOFLAGS: "-mod=mod"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres.internal:5432/${POSTGRES_DB:-agenthub}
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.mcp-client.internal
+    ports:
+      - "8090:8090"
+
+  mcp-server:
+    image: golang:1.24
+    container_name: agenthub-mcp-server
+    working_dir: /app
+    command: go run ./cmd/server
+    volumes:
+      - ../agenthub-mcp-server-runtime:/app
+      - ~/.go/pkg/mod:/go/pkg/mod
+    environment:
+      GOFLAGS: "-mod=mod"
+      HTTP_PORT: "8091"
+      STDIO_MODE: "false"
+      AGENTHUB_BACKEND_URL: http://agenthub.backend.internal:8081
+      AGENTHUB_SKILL_RUNTIME_URL: http://agenthub.skill-runtime.internal:8083
+      AGENTHUB_API_TOKEN: ${MCP_SERVER_API_TOKEN:-}
+      # OAuth 2.1 / RFC 9728 — leave OAUTH_JWKS_URL empty to disable JWT validation in dev
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-https://mcp.cezar.dev}
+      OAUTH_AUTH_SERVER_URL: ${OAUTH_AUTH_SERVER_URL:-https://keycloak.cezar.dev}
+      OAUTH_JWKS_URL: ${OAUTH_JWKS_URL:-}
+      OAUTH_ISSUER_PREFIX: ${OAUTH_ISSUER_PREFIX:-}
+      OAUTH_REQUIRED_SCOPES: ${OAUTH_REQUIRED_SCOPES:-}
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.mcp-server.internal
+    ports:
+      - "8091:8091"
+
+  # ===========================================================================
+  # FRONTEND — node:20 + ng serve
+  # ===========================================================================
+
+  frontend:
+    image: node:20
+    container_name: agenthub-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run start -- --host 0.0.0.0 --poll 2000"
     volumes:
       - ../agenthub-frontend:/app
       - /app/node_modules
     environment:
-      - NG_CLI_ANALYTICS=false
-    command: npm run start -- --host 0.0.0.0 --poll 2000
-
-  # Backend - Spring Boot DevTools hot-reload
-  agenthub-backend:
-    volumes:
-      - ../agenthub-backend:/app
-      - /app/target
-    environment:
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-
-  # Orchestrator - Spring Boot DevTools hot-reload
-  agenthub-orchestrator:
-    volumes:
-      - ../agenthub-orchestrator:/app
-      - /app/target
-    environment:
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-
-  # Skill Runtime - Spring Boot DevTools hot-reload
-  agenthub-skill-runtime:
-    volumes:
-      - ../agenthub-skill-runtime:/app
-      - /app/target
-    environment:
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-
-  # Package Registry - Spring Boot DevTools hot-reload
-  agenthub-package-registry:
-    volumes:
-      - ../agenthub-package-registry:/app
-      - /app/target
-    environment:
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-
-  # Marketplace - Spring Boot DevTools hot-reload
-  agenthub-marketplace:
-    volumes:
-      - ../agenthub-marketplace:/app
-      - /app/target
-    environment:
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-
-  # Observability - Spring Boot DevTools hot-reload
-  agenthub-observability:
-    volumes:
-      - ../agenthub-observability:/app
-      - /app/target
-    environment:
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-
-  # MCP Client Runtime - Go hot-reload with Air
-  agenthub-mcp-client-runtime:
-    volumes:
-      - ../agenthub-mcp-client-runtime:/app
-    command: air -c .air.toml
-
-  # MCP Server Runtime - Go hot-reload with Air
-  agenthub-mcp-server-runtime:
-    volumes:
-      - ../agenthub-mcp-server-runtime:/app
-    command: air -c .air.toml
-
-  # Embedding Service - Go hot-reload with Air
-  agenthub-embedding:
-    volumes:
-      - ../agenthub-embedding:/app
-    command: air -c .air.toml
-
-  # Embedding Job - Go hot-reload with Air
-  agenthub-embedding-job:
-    volumes:
-      - ../agenthub-embedding-job:/app
-    command: air -c .air.toml
-
-  # Extractor - Go hot-reload with Air
-  agenthub-extractor:
-    volumes:
-      - ../agenthub-extractor:/app
-    command: air -c .air.toml
-
-  # Graph Generator - Go hot-reload with Air
-  agenthub-graph-generator:
-    volumes:
-      - ../agenthub-graph-generator:/app
-    command: air -c .air.toml
-
-  # VPN Proxy - Go hot-reload with Air
-  agenthub-vpn-proxy:
-    volumes:
-      - ../agenthub-vpn-proxy:/app
-    command: air -c .air.toml
+      NG_CLI_ANALYTICS: "false"
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.frontend.internal
+    ports:
+      - "4200:4200"

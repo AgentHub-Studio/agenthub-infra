@@ -27,6 +27,9 @@ docker network create agenthub-shared-net
 
 # Start minimal infrastructure (fastest way to get started)
 ./scripts/start minimal
+
+# To run the full platform (./scripts/start will create volumes automatically):
+./scripts/start full
 ```
 
 ### Docker Compose Profiles
@@ -37,14 +40,14 @@ This repository uses Docker Compose **profiles** for granular control over which
 |---------|----------|----------|
 | `minimal` | Infrastructure only (5 services) | Database, auth, storage, messaging |
 | `backend` | Infrastructure + app (7 services) | Full stack development |
-| `full` | All services (18 services) | Complete platform testing |
+| `full` | All services (20 services) | Complete platform testing |
 | `edge` | Backend + edge services (9 services) | Testing with Nginx + Cloudflare |
 
 **Services by profile:**
 
 - **minimal**: postgres, keycloak, minio, ollama, rabbitmq
 - **backend**: minimal + backend + frontend
-- **full**: backend + all microservices (orchestrator, skill-runtime, mcp runtimes, etc.)
+- **full**: backend + all microservices (orchestrator, skill-runtime, mcp runtimes, clickhouse, etc.)
 - **edge**: backend + nginx + cloudflare
 
 ### Using Helper Scripts
@@ -160,6 +163,7 @@ agenthub-infra/
 | Extractor | 8093 | Content extraction (Go) |
 | Graph Generator | 8094 | Knowledge graph generation (Go) |
 | VPN Proxy | 8095 | VPN proxy service (Go) |
+| ClickHouse | 8123/9100 | OLAP database for traces & metrics |
 
 ### Edge (edge profile)
 

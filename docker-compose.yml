@@ -8,18 +8,26 @@ volumes:
   postgres_data:
   minio_data:
   ollama_data:
+  agenthub-clickhouse-data:
+    external: true
+    name: agenthub-clickhouse-data
+  agenthub-clickhouse-logs:
+    external: true
+    name: agenthub-clickhouse-logs
 
 services:
   # ==========================================
   # INFRA - Profile: minimal, backend, full
   # ==========================================
-  
+
   postgres:
     profiles: ["minimal", "backend", "full", "edge"]
     image: postgres:15
     container_name: agenthub-postgres
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - postgres.internal
     ports:
       - "5432:5432"
     environment:
@@ -41,14 +49,16 @@ services:
     image: quay.io/keycloak/keycloak:latest
     container_name: agenthub-keycloak
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - keycloak.internal
     ports:
       - "8080:8080"
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
+      KC_DB_URL: jdbc:postgresql://postgres.internal:5432/${POSTGRES_DB:-agenthub}
       KC_DB_USERNAME: ${POSTGRES_USER:-postgres}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     command: start-dev
@@ -62,7 +72,9 @@ services:
     image: minio/minio:latest
     container_name: agenthub-minio
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - minio.internal
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
@@ -84,7 +96,9 @@ services:
     image: ollama/ollama:latest
     container_name: agenthub-ollama
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - ollama.internal
     ports:
       - "11434:11434"
     volumes:
@@ -96,7 +110,9 @@ services:
     image: rabbitmq:3-management
     container_name: agenthub-rabbitmq
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - rabbitmq.internal
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -116,23 +132,14 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-backend
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.backend.internal
     ports:
       - "${BACKEND_PORT:-8081}:8081"
     environment:
       SERVER_PORT: 8081
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
-      KEYCLOAK_URL: http://keycloak:8080
-      MINIO_URL: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
-      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-agenthub}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-changeme_rabbitmq_password}
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,11 +158,13 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-frontend
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.frontend.internal
     ports:
       - "${FRONTEND_PORT:-4200}:80"
     environment:
-      API_BASE_URL: ${FRONTEND_API_URL:-http://localhost:8081}
+      API_BASE_URL: ${FRONTEND_API_URL:-https://api.cezar.dev}
     depends_on:
       - backend
     restart: unless-stopped
@@ -171,18 +180,13 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-orchestrator
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.orchestrator.internal
     ports:
       - "${ORCHESTRATOR_PORT:-8082}:8082"
     environment:
       SERVER_PORT: 8082
-      BACKEND_URL: http://backend:${BACKEND_PORT:-8081}
-      SKILL_RUNTIME_URL: http://skill-runtime:${SKILL_RUNTIME_PORT:-8083}
-      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
-      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-agenthub}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-changeme_rabbitmq_password}
     depends_on:
       - backend
       - rabbitmq
@@ -196,17 +200,13 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-skill-runtime
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.skill-runtime.internal
     ports:
       - "${SKILL_RUNTIME_PORT:-8083}:8083"
     environment:
       SERVER_PORT: 8083
-      BACKEND_URL: http://backend:${BACKEND_PORT:-8081}
-      MCP_CLIENT_URL: http://mcp-client:${MCP_CLIENT_RUNTIME_PORT:-8090}
-      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
     depends_on:
       - backend
       - postgres
@@ -219,16 +219,20 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-observability
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.observability.internal
     ports:
       - "${OBSERVABILITY_PORT:-8086}:8086"
     environment:
       SERVER_PORT: 8086
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse.internal:8123/agenthub
+      CLICKHOUSE_R2DBC_URL: r2dbc:clickhouse://clickhouse.internal:8123/agenthub
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
     depends_on:
       - postgres
+      - clickhouse
     restart: unless-stopped
 
   package-registry:
@@ -238,17 +242,13 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-package-registry
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.package-registry.internal
     ports:
       - "${PACKAGE_REGISTRY_PORT:-8084}:8084"
     environment:
       SERVER_PORT: 8084
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
-      MINIO_URL: http://minio:${MINIO_API_PORT:-9000}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
     depends_on:
       - postgres
       - minio
@@ -261,14 +261,13 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-marketplace
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.marketplace.internal
     ports:
       - "${MARKETPLACE_PORT:-8085}:8085"
     environment:
       SERVER_PORT: 8085
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agenthub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agenthub}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
     depends_on:
       - postgres
       - package-registry
@@ -285,12 +284,14 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-mcp-client
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.mcp-client.internal
     ports:
       - "${MCP_CLIENT_RUNTIME_PORT:-8090}:8090"
     environment:
       PORT: 8090
-      DB_URL: ${MCP_CLIENT_RUNTIME_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
+      DB_URL: ${MCP_CLIENT_RUNTIME_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
     restart: unless-stopped
 
   mcp-server:
@@ -300,15 +301,47 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-mcp-server
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.mcp-server.internal
     ports:
       - "${MCP_SERVER_RUNTIME_PORT:-8091}:8091"
     environment:
       PORT: 8091
-      BACKEND_URL: http://backend:${BACKEND_PORT:-8081}
-      DB_URL: ${MCP_SERVER_RUNTIME_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
     depends_on:
       - backend
+    restart: unless-stopped
+
+  clickhouse:
+    profiles: ["full"]
+    image: clickhouse/clickhouse-server:24.12
+    container_name: agenthub-clickhouse
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - clickhouse.internal
+    ports:
+      - "8123:8123"
+      - "9100:9000"
+    environment:
+      CLICKHOUSE_DB: agenthub
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - agenthub-clickhouse-data:/var/lib/clickhouse
+      - agenthub-clickhouse-logs:/var/log/clickhouse-server
+      - ../agenthub-clickhouse/config/config.xml:/etc/clickhouse-server/config.d/custom.xml:ro
+      - ../agenthub-clickhouse/initdb:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   # ==========================================
@@ -322,13 +355,15 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-embedding
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.embedding.internal
     ports:
       - "${EMBEDDING_PORT:-8092}:8092"
     environment:
       PORT: 8092
-      DB_URL: ${EMBEDDING_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
-      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
+      DB_URL: ${EMBEDDING_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
+      OLLAMA_URL: http://ollama.internal:11434
     restart: unless-stopped
 
   embedding-job:
@@ -338,12 +373,14 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-embedding-job
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.embedding-job.internal
     environment:
-      DB_URL: ${EMBEDDING_JOB_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
-      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
-      EMBEDDING_SERVICE_URL: http://embedding:${EMBEDDING_PORT:-8092}
-      RABBITMQ_HOST: rabbitmq
+      DB_URL: ${EMBEDDING_JOB_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
+      OLLAMA_URL: http://ollama.internal:11434
+      EMBEDDING_SERVICE_URL: http://agenthub.embedding.internal:8092
+      RABBITMQ_HOST: rabbitmq.internal
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-agenthub}
       RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-changeme_rabbitmq_password}
@@ -360,13 +397,15 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-extractor
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.extractor.internal
     ports:
       - "${EXTRACTOR_PORT:-8093}:8093"
     environment:
       PORT: 8093
-      DB_URL: ${EXTRACTOR_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
-      MINIO_URL: http://minio:${MINIO_API_PORT:-9000}
+      DB_URL: ${EXTRACTOR_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
+      MINIO_URL: http://minio.internal:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
     restart: unless-stopped
@@ -378,13 +417,15 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-graph-generator
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.graph-generator.internal
     ports:
       - "${GRAPH_GENERATOR_PORT:-8094}:8094"
     environment:
       PORT: 8094
-      DB_URL: ${GRAPH_GENERATOR_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
-      OLLAMA_URL: http://ollama:${OLLAMA_PORT:-11434}
+      DB_URL: ${GRAPH_GENERATOR_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
+      OLLAMA_URL: http://ollama.internal:11434
     restart: unless-stopped
 
   vpn-proxy:
@@ -394,12 +435,14 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-vpn-proxy
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - agenthub.vpn-proxy.internal
     ports:
       - "${VPN_PROXY_PORT:-8095}:8095"
     environment:
       PORT: 8095
-      DB_URL: ${VPN_PROXY_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres:5432/agenthub}
+      DB_URL: ${VPN_PROXY_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
     restart: unless-stopped
 
   # ==========================================
@@ -413,10 +456,11 @@ services:
       dockerfile: Dockerfile
     container_name: agenthub-nginx
     networks:
-      - agenthub-shared-net
+      agenthub-shared-net:
+        aliases:
+          - nginx.agenthub.dev.local
     ports:
-      - "80:80"
-      - "443:443"
+      - "10000:10000"
     depends_on:
       - backend
       - frontend
@@ -427,9 +471,7 @@ services:
     build:
       context: ../agenthub-cloudflare
       dockerfile: Dockerfile
-    container_name: agenthub-cloudflare
+    container_name: agenthub-cloudflared
     networks:
       - agenthub-shared-net
-    environment:
-      CLOUDFLARE_TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     restart: unless-stopped

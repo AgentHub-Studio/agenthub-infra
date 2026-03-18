@@ -55,6 +55,16 @@ if ! docker network inspect agenthub-shared-net >/dev/null 2>&1; then
     docker network create agenthub-shared-net
 fi
 
+# Create ClickHouse external volumes if needed (full/edge profiles)
+if [[ "$PROFILE" == "full" || "$PROFILE" == "edge" ]]; then
+    for vol in agenthub-clickhouse-data agenthub-clickhouse-logs; do
+        if ! docker volume inspect "$vol" >/dev/null 2>&1; then
+            echo -e "${BLUE}Creating Docker volume: ${vol}${NC}"
+            docker volume create "$vol"
+        fi
+    done
+fi
+
 echo -e "${GREEN}Starting AgentHub with profile: ${PROFILE}${NC}"
 echo ""
 
@@ -114,6 +124,7 @@ case "$PROFILE" in
         echo "  MinIO Console: http://localhost:9001"
         echo "  RabbitMQ Mgmt: http://localhost:15672"
         echo "  Ollama:        http://localhost:11434"
+        echo "  ClickHouse:    http://localhost:8123"
         ;;
     edge)
         echo "All services running with edge exposure:"
