@@ -155,7 +155,7 @@ services:
     profiles: ["backend", "full", "edge"]
     build:
       context: ../agenthub-frontend
-      dockerfile: Dockerfile
+      dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile}
     container_name: agenthub-frontend
     networks:
       agenthub-shared-net:
@@ -165,6 +165,30 @@ services:
       - "${FRONTEND_PORT:-4200}:80"
     environment:
       API_BASE_URL: ${FRONTEND_API_URL:-https://api.cezar.dev}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # FLUTTER CHAT - Profile: backend, full, edge
+  # ==========================================
+
+  chat:
+    profiles: ["backend", "full", "edge"]
+    build:
+      context: ../agenthub-chat
+      dockerfile: Dockerfile
+      args:
+        PARENT_ORIGIN: ${CHAT_PARENT_ORIGIN:-https://app.cezar.dev}
+    container_name: agenthub-chat
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.chat.internal
+    ports:
+      - "${CHAT_PORT:-4300}:80"
+    environment:
+      AGENTHUB_BACKEND_URL: ${CHAT_BACKEND_URL:-http://agenthub.backend.internal:8081}
     depends_on:
       - backend
     restart: unless-stopped
