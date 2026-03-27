@@ -3,7 +3,7 @@
 # AgentHub Infrastructure - Run individual dev service
 # Usage: ./scripts/dev <service>
 # Services: backend, orchestrator, skill-runtime, package-registry,
-#           marketplace, observability, mcp-client, mcp-server, frontend
+#           marketplace, observability, mcp-client, mcp-server, frontend, chat
 
 set -e
 
