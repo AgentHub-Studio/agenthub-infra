@@ -183,6 +183,36 @@ services:
       - "8091:8091"
 
   # ===========================================================================
+  # CHAT — Flutter web + hot reload
+  # ===========================================================================
+
+  chat:
+    build:
+      context: ../agenthub-chat
+      dockerfile: Dockerfile.dev
+    container_name: agenthub-chat
+    working_dir: /app
+    command: >
+      sh -c "flutter pub get &&
+             dart run build_runner build --delete-conflicting-outputs &&
+             npm install --prefix /app &&
+             flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0 &
+             sleep 15 && node server.js"
+    volumes:
+      - ../agenthub-chat:/app
+      - ~/.pub-cache:/root/.pub-cache
+    environment:
+      PUB_CACHE: /root/.pub-cache
+      FLUTTER_DEV_URL: http://localhost:8080
+      AGENTHUB_BACKEND_URL: http://agenthub.backend.internal:8081
+    networks:
+      agenthub-shared-net:
+        aliases:
+          - agenthub.chat.internal
+    ports:
+      - "3000:80"
+
+  # ===========================================================================
   # FRONTEND — node:20 + ng serve
   # ===========================================================================
 
@@ -190,7 +220,7 @@ services:
     image: node:20
     container_name: agenthub-frontend
     working_dir: /app
-    command: sh -c "npm install && npm run start -- --host 0.0.0.0 --poll 2000"
+    command: sh -c "npm ci --legacy-peer-deps && npm run start"
     volumes:
       - ../agenthub-frontend:/app
       - /app/node_modules
@@ -201,4 +231,4 @@ services:
         aliases:
           - agenthub.frontend.internal
     ports:
-      - "4200:4200"
+      - "80:80"
