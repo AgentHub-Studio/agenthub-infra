@@ -1,0 +1,119 @@
+# ============================================================
+# Ingress Traefik para AgentHub (multi-tenant *.cezar.dev)
+# ============================================================
+---
+# app.cezar.dev e *.cezar.dev → frontend Angular (multi-tenant)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agenthub-frontend
+  namespace: agenthub
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.priority: "1"
+spec:
+  rules:
+    - host: app.cezar.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agenthub-frontend
+                port:
+                  number: 80
+    - host: "*.cezar.dev"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agenthub-frontend
+                port:
+                  number: 80
+---
+# api.cezar.dev → backend
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agenthub-api
+  namespace: agenthub
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: api.cezar.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agenthub-backend
+                port:
+                  number: 8081
+---
+# keycloak.cezar.dev → keycloak
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agenthub-keycloak
+  namespace: agenthub
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: keycloak.cezar.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080
+---
+# chat.cezar.dev → Flutter chat
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agenthub-chat
+  namespace: agenthub
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: chat.cezar.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agenthub-chat
+                port:
+                  number: 80
+---
+# minio.cezar.dev → MinIO console
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agenthub-minio
+  namespace: agenthub
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: minio.cezar.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9001
