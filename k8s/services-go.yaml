@@ -322,3 +322,5 @@ data:
   keycloak-url: "http://keycloak.agenthub.svc.cluster.local:8080"
   minio-endpoint: "minio.agenthub.svc.cluster.local:9000"
   cors-origins: "https://app.agenthub.dev,http://localhost:4200"
+  # Ollama local inference (opcional — remova se não usar Ollama)
+  ollama-base-url: "http://ollama.agenthub.svc.cluster.local:11434"
