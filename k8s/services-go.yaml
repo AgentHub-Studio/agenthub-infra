@@ -1,0 +1,324 @@
+# agenthub-api (Go) — Fase 2 Backend Core
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-api
+  namespace: agenthub
+  labels:
+    app: agenthub-api
+    version: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agenthub-api
+  template:
+    metadata:
+      labels:
+        app: agenthub-api
+        version: go
+    spec:
+      containers:
+        - name: agenthub-api
+          image: registry.local/agenthub-api:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: database-url
+            - name: KEYCLOAK_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: agenthub-config
+                  key: keycloak-url
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: agenthub-config
+                  key: minio-endpoint
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: minio-secret-key
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: rabbitmq-url
+            - name: LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-api
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-api
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+# agenthub-orchestrator (Go) — Fase 4 Orchestrator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-orchestrator
+  namespace: agenthub
+  labels:
+    app: agenthub-orchestrator
+    version: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agenthub-orchestrator
+  template:
+    metadata:
+      labels:
+        app: agenthub-orchestrator
+        version: go
+    spec:
+      containers:
+        - name: agenthub-orchestrator
+          image: registry.local/agenthub-orchestrator:latest
+          ports:
+            - containerPort: 8084
+          env:
+            - name: PORT
+              value: "8084"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: database-url
+            - name: KEYCLOAK_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: agenthub-config
+                  key: keycloak-url
+            - name: SKILL_RUNTIME_URL
+              value: "http://agenthub-skill-runtime:8083"
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: rabbitmq-url
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-orchestrator
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-orchestrator
+  ports:
+    - port: 8084
+      targetPort: 8084
+---
+# agenthub-skill-runtime (Go) — Fase 3 Skill Runtime
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-skill-runtime
+  namespace: agenthub
+  labels:
+    app: agenthub-skill-runtime
+    version: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agenthub-skill-runtime
+  template:
+    metadata:
+      labels:
+        app: agenthub-skill-runtime
+        version: go
+    spec:
+      containers:
+        - name: agenthub-skill-runtime
+          image: registry.local/agenthub-skill-runtime:latest
+          ports:
+            - containerPort: 8083
+          env:
+            - name: PORT
+              value: "8083"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: database-url
+            - name: KEYCLOAK_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: agenthub-config
+                  key: keycloak-url
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-skill-runtime
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-skill-runtime
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+# agenthub-observability (Go) — Fase 1 Observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-observability
+  namespace: agenthub
+  labels:
+    app: agenthub-observability
+    version: go
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-observability
+  template:
+    metadata:
+      labels:
+        app: agenthub-observability
+        version: go
+    spec:
+      containers:
+        - name: agenthub-observability
+          image: registry.local/agenthub-observability:latest
+          ports:
+            - containerPort: 8086
+          env:
+            - name: PORT
+              value: "8086"
+            - name: CLICKHOUSE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: clickhouse-dsn
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: rabbitmq-url
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8086
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8086
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-observability
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-observability
+  ports:
+    - port: 8086
+      targetPort: 8086
+---
+# ConfigMap for Go services
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agenthub-config
+  namespace: agenthub
+data:
+  keycloak-url: "http://keycloak.agenthub.svc.cluster.local:8080"
+  minio-endpoint: "minio.agenthub.svc.cluster.local:9000"
+  cors-origins: "https://app.agenthub.dev,http://localhost:4200"
