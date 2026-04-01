@@ -1,0 +1,77 @@
+---
+# Blue-Green: agenthub-api Go deployment
+# Deploy alongside Java BEFORE switching traffic.
+# Switch: kubectl patch svc agenthub-api -n agenthub
+#           -p '{"spec":{"selector":{"app":"agenthub-api","version":"go"}}}'
+# NOTE: agenthub-api replaces agenthub-backend + agenthub-marketplace + agenthub-package-registry.
+#       After a successful 48h monitoring window, delete all three Java deployments.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-api-go
+  namespace: agenthub
+  labels:
+    app: agenthub-api
+    version: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agenthub-api
+      version: go
+  template:
+    metadata:
+      labels:
+        app: agenthub-api
+        version: go
+    spec:
+      containers:
+        - name: api
+          image: localhost:5000/agenthub-api:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: agenthub-api-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: DATABASE_URL
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: MINIO_SECRET_KEY
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
