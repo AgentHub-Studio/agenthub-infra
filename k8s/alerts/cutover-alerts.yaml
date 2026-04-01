@@ -1,0 +1,158 @@
+---
+# PrometheusRule: alertas para o cutover Java → Go
+# Apply: kubectl apply -f k8s/alerts/cutover-alerts.yaml
+# Requires: prometheus-operator (kube-prometheus-stack)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agenthub-cutover-alerts
+  namespace: agenthub
+  labels:
+    app: agenthub
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: agenthub.cutover.latency
+      interval: 30s
+      rules:
+        - alert: AgentHubGoLatencyHighVsJava
+          expr: |
+            (
+              histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{version="go"}[5m])) by (le, service))
+              /
+              histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{version="java"}[5m])) by (le, service))
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+            phase: cutover
+          annotations:
+            summary: "Latência P95 Go {{ $labels.service }} > 2x Java"
+            description: >
+              O serviço Go {{ $labels.service }} está com latência P95
+              {{ $value | humanize }}x maior que o baseline Java.
+              Considere rollback se persistir.
+
+        - alert: AgentHubGoLatencyCritical
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{version="go"}[5m])) by (le, service)) > 2
+          for: 3m
+          labels:
+            severity: critical
+            phase: cutover
+          annotations:
+            summary: "Latência P95 Go {{ $labels.service }} > 2s"
+            description: >
+              Latência P95 acima de 2s no serviço Go {{ $labels.service }}.
+              Rollback imediato recomendado.
+
+    - name: agenthub.cutover.errors
+      interval: 30s
+      rules:
+        - alert: AgentHubGoErrorRateHigh
+          expr: |
+            sum(rate(http_requests_total{version="go",status=~"5.."}[5m])) by (service)
+            /
+            sum(rate(http_requests_total{version="go"}[5m])) by (service)
+            > 0.01
+          for: 3m
+          labels:
+            severity: critical
+            phase: cutover
+          annotations:
+            summary: "Error rate 5xx Go {{ $labels.service }} > 1%"
+            description: >
+              O serviço Go {{ $labels.service }} tem error rate de
+              {{ $value | humanizePercentage }} (acima do limiar de 1%).
+              Rollback imediato: ./k8s/cutover/rollback-{{ $labels.service }}.sh
+
+        - alert: AgentHubGoErrorRateWarning
+          expr: |
+            sum(rate(http_requests_total{version="go",status=~"5.."}[5m])) by (service)
+            /
+            sum(rate(http_requests_total{version="go"}[5m])) by (service)
+            > 0.001
+          for: 5m
+          labels:
+            severity: warning
+            phase: cutover
+          annotations:
+            summary: "Error rate 5xx Go {{ $labels.service }} > 0.1%"
+            description: >
+              Error rate de {{ $value | humanizePercentage }} em {{ $labels.service }}.
+              Monitorar de perto. Limiar crítico: 1%.
+
+    - name: agenthub.cutover.resources
+      interval: 60s
+      rules:
+        - alert: AgentHubGoPodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="agenthub"}[15m]) > 3
+          for: 0m
+          labels:
+            severity: critical
+            phase: cutover
+          annotations:
+            summary: "Pod {{ $labels.pod }} em CrashLoop"
+            description: >
+              Pod {{ $labels.pod }} reiniciou {{ $value }} vezes nos últimos 15 minutos.
+              Rollback imediato.
+
+        - alert: AgentHubGoMemoryHigh
+          expr: |
+            container_memory_working_set_bytes{namespace="agenthub",container!=""}
+            > 200 * 1024 * 1024
+          for: 10m
+          labels:
+            severity: warning
+            phase: cutover
+          annotations:
+            summary: "Pod Go {{ $labels.pod }} usando > 200Mi"
+            description: >
+              O pod Go {{ $labels.pod }} está usando {{ $value | humanize1024 }}B de memória.
+              Go deveria usar < 128Mi. Verificar memory leak.
+
+    - name: agenthub.cutover.observability
+      interval: 60s
+      rules:
+        - alert: AgentHubObservabilityIngestStalled
+          expr: |
+            rate(execution_events_consumed_total{version="go"}[5m]) == 0
+          for: 5m
+          labels:
+            severity: warning
+            phase: cutover
+          annotations:
+            summary: "Ingestão de eventos parou no Go observability"
+            description: >
+              O serviço observability Go não consumiu nenhum evento nos últimos 5 minutos.
+              Verificar conexão com RabbitMQ e logs do pod.
+
+        - alert: AgentHubClickHouseWriteStalled
+          expr: |
+            rate(clickhouse_writes_total{version="go"}[5m]) == 0
+          for: 5m
+          labels:
+            severity: warning
+            phase: cutover
+          annotations:
+            summary: "Writes no ClickHouse pararam no Go observability"
+            description: >
+              Nenhum write para ClickHouse nos últimos 5 minutos.
+              Verificar conectividade e logs.
+
+    - name: agenthub.cutover.tenancy
+      interval: 60s
+      rules:
+        - alert: AgentHubTenantSchemaError
+          expr: |
+            rate(tenant_schema_errors_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            phase: cutover
+          annotations:
+            summary: "Erro de schema multi-tenant detectado"
+            description: >
+              Erros de isolamento de schema tenant detectados em {{ $labels.service }}.
+              POSSÍVEL DATA LEAK. Rollback imediato e investigação obrigatória.
