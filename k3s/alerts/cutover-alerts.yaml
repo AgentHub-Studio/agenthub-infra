@@ -1,0 +1,66 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agenthub-cutover-alerts
+  namespace: agenthub
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: agenthub.cutover
+      interval: 30s
+      rules:
+        # Alerta: latência P95 do serviço Go excede 2x o baseline Java
+        - alert: AgentHubGoLatencyHigh
+          expr: |
+            histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace="agenthub",version="go"}[5m]))
+            > 2 *
+            histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace="agenthub",version="java"}[5m]))
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Latência Go > 2x baseline Java em {{ $labels.service }}"
+            description: "P95 do serviço Go está {{ $value | humanizeDuration }} — mais de 2x o baseline Java."
+
+        # Alerta: taxa de erros 5xx acima de 1%
+        - alert: AgentHubGoErrorRateHigh
+          expr: |
+            rate(http_requests_total{namespace="agenthub",version="go",status=~"5.."}[5m])
+            /
+            rate(http_requests_total{namespace="agenthub",version="go"}[5m])
+            > 0.01
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Taxa de erros 5xx > 1% em {{ $labels.service }} (Go)"
+            description: "Error rate atual: {{ $value | humanizePercentage }}. Considerar rollback imediato."
+
+        # Alerta: pod Go não está ready
+        - alert: AgentHubGoPodsNotReady
+          expr: |
+            kube_deployment_status_replicas_ready{namespace="agenthub"}
+            < kube_deployment_spec_replicas{namespace="agenthub"}
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Deployment {{ $labels.deployment }} com pods não prontos"
+            description: "{{ $value }} replicas prontas de {{ $labels.deployment }} — esperado mais."
+
+        # Alerta: memory usage do pod Go acima de 128Mi
+        - alert: AgentHubGoMemoryHigh
+          expr: |
+            container_memory_working_set_bytes{namespace="agenthub",version="go"}
+            > 134217728
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Memory usage do pod Go {{ $labels.pod }} acima de 128Mi"
+            description: "Memory: {{ $value | humanize1024 }}Bi — acima do limite esperado de 128Mi."

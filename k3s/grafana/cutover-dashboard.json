@@ -1,0 +1,96 @@
+{
+  "title": "AgentHub Cutover — Java vs Go",
+  "uid": "agenthub-cutover",
+  "schemaVersion": 38,
+  "tags": ["agenthub", "cutover", "migration"],
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "Latência P95 — Java vs Go",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace=\"agenthub\",version=\"java\"}[5m]))",
+          "legendFormat": "Java P95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace=\"agenthub\",version=\"go\"}[5m]))",
+          "legendFormat": "Go P95"
+        }
+      ]
+    },
+    {
+      "title": "Taxa de Erros 5xx — Java vs Go",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{namespace=\"agenthub\",version=\"java\",status=~\"5..\"}[5m])",
+          "legendFormat": "Java 5xx/s"
+        },
+        {
+          "expr": "rate(http_requests_total{namespace=\"agenthub\",version=\"go\",status=~\"5..\"}[5m])",
+          "legendFormat": "Go 5xx/s"
+        }
+      ]
+    },
+    {
+      "title": "Memory Usage por Pod",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "container_memory_working_set_bytes{namespace=\"agenthub\",version=\"java\"}",
+          "legendFormat": "Java — {{pod}}"
+        },
+        {
+          "expr": "container_memory_working_set_bytes{namespace=\"agenthub\",version=\"go\"}",
+          "legendFormat": "Go — {{pod}}"
+        }
+      ]
+    },
+    {
+      "title": "CPU Usage por Pod",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{namespace=\"agenthub\",version=\"java\"}[5m])",
+          "legendFormat": "Java — {{pod}}"
+        },
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{namespace=\"agenthub\",version=\"go\"}[5m])",
+          "legendFormat": "Go — {{pod}}"
+        }
+      ]
+    },
+    {
+      "title": "Throughput (req/s) — Java vs Go",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{namespace=\"agenthub\",version=\"java\"}[5m])",
+          "legendFormat": "Java req/s"
+        },
+        {
+          "expr": "rate(http_requests_total{namespace=\"agenthub\",version=\"go\"}[5m])",
+          "legendFormat": "Go req/s"
+        }
+      ]
+    },
+    {
+      "title": "Pods Ativos por Versão",
+      "type": "stat",
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "count(kube_pod_info{namespace=\"agenthub\"}) by (version)",
+          "legendFormat": "{{version}}"
+        }
+      ]
+    }
+  ]
+}
