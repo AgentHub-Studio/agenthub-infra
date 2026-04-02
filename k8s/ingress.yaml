@@ -76,7 +76,29 @@ spec:
                 port:
                   number: 8080
 ---
-# chat.cezar.dev → Flutter chat
+# chat.cezar.dev/api/ → agenthub-api (session relay + chat endpoints for Flutter widget)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agenthub-chat-api
+  namespace: agenthub
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.priority: "10"
+spec:
+  rules:
+    - host: chat.cezar.dev
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: agenthub-api
+                port:
+                  number: 8081
+---
+# chat.cezar.dev → Flutter chat (static files)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
