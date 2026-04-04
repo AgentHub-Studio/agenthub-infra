@@ -51,7 +51,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: agenthub-backend
+                name: agenthub-api
                 port:
                   number: 8081
 ---
@@ -76,29 +76,8 @@ spec:
                 port:
                   number: 8080
 ---
-# chat.cezar.dev/api/ → agenthub-api (session relay + chat endpoints for Flutter widget)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: agenthub-chat-api
-  namespace: agenthub
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-    traefik.ingress.kubernetes.io/router.priority: "10"
-spec:
-  rules:
-    - host: chat.cezar.dev
-      http:
-        paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: agenthub-api
-                port:
-                  number: 8081
----
-# chat.cezar.dev → Flutter chat (static files)
+# chat.cezar.dev — Flutter chat (static files) + /api → agenthub-api
+# Note: /api must be listed first so Traefik picks it as the more specific path
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -111,6 +90,13 @@ spec:
     - host: chat.cezar.dev
       http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: agenthub-api
+                port:
+                  number: 8081
           - path: /
             pathType: Prefix
             backend:
