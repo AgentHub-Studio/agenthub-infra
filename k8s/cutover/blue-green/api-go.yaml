@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: localhost:5000/agenthub-api:latest
+          image: registry.cezar.dev/agenthub-api:latest
           ports:
             - containerPort: 8081
           envFrom:

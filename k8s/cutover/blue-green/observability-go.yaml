@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: observability
-          image: localhost:5000/agenthub-observability:latest
+          image: registry.cezar.dev/agenthub-observability:latest
           ports:
             - containerPort: 8086
           envFrom:
