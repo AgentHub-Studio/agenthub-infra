@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: skill-runtime
-          image: localhost:5000/agenthub-skill-runtime:latest
+          image: registry.cezar.dev/agenthub-skill-runtime:latest
           ports:
             - containerPort: 8083
           envFrom:
