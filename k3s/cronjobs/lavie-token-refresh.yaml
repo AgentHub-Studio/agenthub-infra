@@ -1,0 +1,67 @@
+---
+# Secret with the OAuth2 client_credentials used to obtain Lavie tokens.
+# Pre-provisioned by V0157 migration in the Lavie backend repo. Rotate client
+# secret in-place here and in oauth_client_details.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: lavie-token-refresh
+  namespace: agenthub
+type: Opaque
+stringData:
+  LAVIE_CLIENT_ID: agenthub-chat
+  LAVIE_CLIENT_SECRET: agenthub-chat-secret-please-change
+  LAVIE_TOKEN_URL: http://lavie-backend.lavie.svc.cluster.local:8080/oauth/token
+  # Postgres — reuses the same root credentials already consumed by agenthub-api.
+  DB_HOST: postgres.agenthub.svc.cluster.local
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  DB_NAME: agenthub
+  TENANT_SCHEMA: ah_lavie-ai
+---
+# CronJob: every 50 minutes, exchange client_credentials for a JWT and store
+# it as the `lavie.token` setting in the lavie-ai tenant schema. Token TTL is
+# 1h (3600s) — 50min keeps a 10min safety margin.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lavie-token-refresh
+  namespace: agenthub
+spec:
+  schedule: "*/50 * * * *"
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: refresh
+              image: alpine:3.20
+              envFrom:
+                - secretRef:
+                    name: lavie-token-refresh
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  apk add --no-cache curl postgresql-client >/dev/null
+                  echo "[$(date -u +%FT%TZ)] requesting token from ${LAVIE_TOKEN_URL}"
+                  TOKEN=$(curl -fsS \
+                    -u "${LAVIE_CLIENT_ID}:${LAVIE_CLIENT_SECRET}" \
+                    -d 'grant_type=client_credentials&scope=agenthub.full' \
+                    "${LAVIE_TOKEN_URL}" \
+                    | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+                  if [ -z "${TOKEN}" ]; then
+                    echo "ERROR: empty access_token in response" >&2
+                    exit 1
+                  fi
+                  echo "[$(date -u +%FT%TZ)] token length=${#TOKEN}; updating ${TENANT_SCHEMA}.settings"
+                  PGPASSWORD="${DB_PASSWORD}" psql \
+                    -h "${DB_HOST}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 \
+                    -c "UPDATE \"${TENANT_SCHEMA}\".settings SET value = to_jsonb('${TOKEN}'::text), updated_at = NOW() WHERE key = 'lavie.token';"
+                  echo "[$(date -u +%FT%TZ)] done"
