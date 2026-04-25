@@ -20,7 +20,8 @@ spec:
     spec:
       containers:
         - name: agenthub-api
-          image: registry.local/agenthub-api:latest
+          image: registry.cezar.dev/agenthub-api:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8081
           env:
@@ -55,7 +56,12 @@ spec:
               valueFrom:
                 configMapKeyRef:
                   name: agenthub-config
-                  key: keycloak-base-url
+                  key: keycloak-url
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: agenthub-config
+                  key: cors-origins
           livenessProbe:
             httpGet:
               path: /health
