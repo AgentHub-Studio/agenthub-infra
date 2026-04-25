@@ -120,7 +120,8 @@ spec:
     spec:
       containers:
         - name: agenthub-orchestrator
-          image: registry.local/agenthub-orchestrator:latest
+          image: registry.cezar.dev/agenthub-orchestrator:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8084
           env:
@@ -270,7 +271,8 @@ spec:
     spec:
       containers:
         - name: agenthub-observability
-          image: registry.local/agenthub-observability:latest
+          image: registry.cezar.dev/agenthub-observability:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8086
           env:
@@ -281,11 +283,18 @@ spec:
                 secretKeyRef:
                   name: agenthub-secrets
                   key: clickhouse-dsn
+            - name: CLICKHOUSE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: CLICKHOUSE_URL
             - name: RABBITMQ_URL
               valueFrom:
                 secretKeyRef:
                   name: agenthub-secrets
                   key: rabbitmq-url
+            - name: KEYCLOAK_BASE_URL
+              value: "http://keycloak.agenthub.svc.cluster.local:8080"
           resources:
             requests:
               memory: "32Mi"
