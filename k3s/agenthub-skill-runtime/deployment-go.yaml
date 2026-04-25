@@ -20,7 +20,8 @@ spec:
     spec:
       containers:
         - name: agenthub-skill-runtime
-          image: registry.local/agenthub-skill-runtime:latest
+          image: registry.cezar.dev/agenthub-skill-runtime:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8083
           env:
@@ -40,7 +41,7 @@ spec:
               valueFrom:
                 configMapKeyRef:
                   name: agenthub-config
-                  key: keycloak-base-url
+                  key: keycloak-url
           livenessProbe:
             httpGet:
               path: /health
