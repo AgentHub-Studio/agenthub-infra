@@ -20,7 +20,8 @@ spec:
     spec:
       containers:
         - name: agenthub-observability
-          image: registry.local/agenthub-observability:latest
+          image: registry.cezar.dev/agenthub-observability:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8086
           env:
@@ -40,7 +41,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: agenthub-secrets
-                  key: clickhouse-url
+                  key: CLICKHOUSE_URL
           livenessProbe:
             httpGet:
               path: /health
@@ -69,7 +70,7 @@ metadata:
 spec:
   selector:
     app: agenthub-observability
-    version: java
+    version: go
   ports:
     - port: 8086
       targetPort: 8086
