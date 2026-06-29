@@ -23,9 +23,20 @@ spec:
         app: agenthub-orchestrator
         version: go
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: orchestrator
-          image: registry.cezar.dev/agenthub-orchestrator:latest
+          image: registry.cezar.dev/agenthub-orchestrator:dea0c0302a7d
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8084
           envFrom:

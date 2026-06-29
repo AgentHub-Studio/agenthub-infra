@@ -22,7 +22,16 @@ services:
 
   postgres:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: postgres:15
+    image: registry.cezar.dev/agenthub-infra-postgres:76eb21cdf814
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: images/postgres/Dockerfile
+      args:
+        OCI_CREATED: ${OCI_CREATED:-2026-06-29T20:00:00Z}
+        OCI_REVISION: 76eb21cdf814153d3bc46f6b8661217686a47e1e
+        OCI_VERSION: 76eb21cdf814
+        OCI_TITLE: agenthub-infra-postgres
     container_name: agenthub-postgres
     networks:
       agenthub-shared-net:
@@ -46,8 +55,18 @@ services:
 
   keycloak:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: quay.io/keycloak/keycloak:latest
+    image: registry.cezar.dev/agenthub-infra-keycloak:76eb21cdf814
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: images/keycloak/Dockerfile
+      args:
+        OCI_CREATED: ${OCI_CREATED:-2026-06-29T20:00:00Z}
+        OCI_REVISION: 76eb21cdf814153d3bc46f6b8661217686a47e1e
+        OCI_VERSION: 76eb21cdf814
+        OCI_TITLE: agenthub-infra-keycloak
     container_name: agenthub-keycloak
+    user: "10001:10001"
     networks:
       agenthub-shared-net:
         aliases:
@@ -57,6 +76,7 @@ services:
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HTTP_HOST: "0.0.0.0"
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres.internal:5432/${POSTGRES_DB:-agenthub}
       KC_DB_USERNAME: ${POSTGRES_USER:-postgres}
@@ -69,8 +89,10 @@ services:
 
   minio:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: minio/minio:latest
+    image: registry.cezar.dev/agenthub-infra-seaweedfs:76eb21cdf814
+    pull_policy: missing
     container_name: agenthub-minio
+    user: "10001:10001"
     networks:
       agenthub-shared-net:
         aliases:
@@ -81,11 +103,17 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "nc -z localhost 9000"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -93,8 +121,10 @@ services:
 
   ollama:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: ollama/ollama:latest
+    image: registry.cezar.dev/agenthub-infra-ollama:76eb21cdf814
+    pull_policy: missing
     container_name: agenthub-ollama
+    user: "10001:10001"
     networks:
       agenthub-shared-net:
         aliases:
@@ -102,7 +132,19 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama_data:/home/ollama/.ollama
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "OLLAMA_HOST=http://127.0.0.1:11434 ollama list >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
     restart: unless-stopped
 
   rabbitmq:

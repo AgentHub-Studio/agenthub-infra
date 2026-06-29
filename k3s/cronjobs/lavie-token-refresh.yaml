@@ -37,23 +37,37 @@ spec:
       backoffLimit: 2
       template:
         spec:
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
           restartPolicy: OnFailure
           containers:
             - name: refresh
-              image: alpine:3.20
+              image: postgres:16-alpine
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
               envFrom:
                 - secretRef:
                     name: lavie-token-refresh
+              env:
+                - name: HOME
+                  value: /tmp
               command:
                 - /bin/sh
                 - -c
                 - |
                   set -e
-                  apk add --no-cache curl postgresql-client >/dev/null
                   echo "[$(date -u +%FT%TZ)] requesting token from ${LAVIE_TOKEN_URL}"
-                  TOKEN=$(curl -fsS \
-                    -u "${LAVIE_CLIENT_ID}:${LAVIE_CLIENT_SECRET}" \
-                    -d 'grant_type=client_credentials&scope=agenthub.full' \
+                  BASIC_AUTH=$(printf '%s:%s' "${LAVIE_CLIENT_ID}" "${LAVIE_CLIENT_SECRET}" | base64 | tr -d '\n')
+                  TOKEN=$(wget -qO- \
+                    --header="Authorization: Basic ${BASIC_AUTH}" \
+                    --header="Content-Type: application/x-www-form-urlencoded" \
+                    --post-data='grant_type=client_credentials&scope=agenthub.full' \
                     "${LAVIE_TOKEN_URL}" \
                     | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
                   if [ -z "${TOKEN}" ]; then

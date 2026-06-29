@@ -18,10 +18,20 @@ spec:
         app: agenthub-observability
         version: go
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: agenthub-observability
-          image: registry.cezar.dev/agenthub-observability:latest
-          imagePullPolicy: Always
+          image: registry.cezar.dev/agenthub-observability:bf8bc6b5452a
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8086
           env:

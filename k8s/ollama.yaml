@@ -26,14 +26,27 @@ spec:
       labels:
         app: ollama
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: ollama
-          image: ollama/ollama:latest
+          image: registry.cezar.dev/agenthub-infra-ollama:76eb21cdf814
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 11434
           volumeMounts:
             - name: data
-              mountPath: /root/.ollama
+              mountPath: /home/ollama/.ollama
           resources:
             requests:
               cpu: 500m

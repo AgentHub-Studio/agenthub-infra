@@ -18,10 +18,20 @@ spec:
         app: agenthub-api
         version: go
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: agenthub-api
-          image: registry.cezar.dev/agenthub-api:latest
-          imagePullPolicy: Always
+          image: registry.cezar.dev/agenthub-api:84f4f9c5adcc
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8081
           env:

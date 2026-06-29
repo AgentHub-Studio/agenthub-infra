@@ -26,10 +26,24 @@ spec:
       labels:
         app: minio
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: minio
-          image: minio/minio:latest
-          args: ["server", "/data", "--console-address", ":9001"]
+          image: registry.cezar.dev/agenthub-infra-seaweedfs:76eb21cdf814
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 9000
             - containerPort: 9001
@@ -47,9 +61,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
-            httpGet:
-              path: /minio/health/live
+            tcpSocket:
               port: 9000
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -64,6 +79,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: minio-pvc
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
