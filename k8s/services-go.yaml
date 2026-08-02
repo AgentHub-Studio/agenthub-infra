@@ -164,6 +164,27 @@ spec:
                 secretKeyRef:
                   name: agenthub-secrets
                   key: rabbitmq-url
+            # Provider de LLM. Até 2026-08-02 o orchestrator subia sem nenhuma env de
+            # provider, então só o Ollama era registrado (OLLAMA_BASE_URL tem default
+            # "http://ollama:11434" no código) — apontando para um Ollama sem modelo
+            # carregado. Na prática, geração não funcionava.
+            # O provider "ollama" é um wrapper sobre o cliente OpenAI, então o LiteLLM
+            # atende os dois caminhos. openai-base-url deve apontar para
+            # http://litellm.litellm.svc.cluster.local:4000/v1 e openai-api-key deve
+            # conter o LITELLM_MASTER_KEY (copiado de litellm-secrets — Secret é
+            # namespaced e não cruza de litellm para agenthub).
+            - name: OPENAI_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: agenthub-config
+                  key: openai-base-url
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: openai-api-key
+                  optional: true
           resources:
             requests:
               memory: "32Mi"
