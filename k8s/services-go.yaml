@@ -25,7 +25,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agenthub-api
-          image: registry.cezar.dev/agenthub-api@sha256:22b0195549886e45329e2413c6189ecf2b177d990a6744bb24c28209c300c069
+          image: registry.cezar.dev/agenthub-api@sha256:9118b437cf2b47f086d27501db5a75e38baffb08c9cff4c0a69bcb29b5ceb00c
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
