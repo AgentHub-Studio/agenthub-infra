@@ -144,15 +144,21 @@ services:
       - ../agenthub-mcp-client-runtime:/app
       - ~/.go/pkg/mod:/go/pkg/mod
     environment:
-      PORT: "8090"
+      HTTP_PORT: "8080"
+      GRPC_PORT: "50051"
+      LOG_LEVEL: ${MCP_CLIENT_RUNTIME_LOG_LEVEL:-info}
+      AGENTHUB_BACKEND_URL: ${MCP_CLIENT_RUNTIME_BACKEND_URL:-http://agenthub.backend.internal:8081}
+      AGENTHUB_TENANT_ID: ${MCP_CLIENT_RUNTIME_TENANT_ID:-test}
+      AGENTHUB_KEYCLOAK_BASE_URL: ${MCP_CLIENT_RUNTIME_KEYCLOAK_BASE_URL:-http://keycloak.internal:8080}
+      AGENTHUB_CLIENT_ID: ${MCP_CLIENT_RUNTIME_CLIENT_ID:-agenthub-mcp-client-runtime}
+      AGENTHUB_CLIENT_SECRET: ${MCP_CLIENT_RUNTIME_CLIENT_SECRET:-}
       GOFLAGS: "-mod=mod"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres.internal:5432/${POSTGRES_DB:-agenthub}
     networks:
       agenthub-shared-net:
         aliases:
           - agenthub.mcp-client.internal
     ports:
-      - "8090:8090"
+      - "${MCP_CLIENT_RUNTIME_PORT:-8090}:8080"
 
   mcp-server:
     image: golang:1.24

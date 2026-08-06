@@ -123,7 +123,7 @@ agenthub-infra/
 │       ├── java-ci.yml     # Java CI/CD template
 │       └── go-ci.yml       # Go CI/CD template
 ├── docker/                 # Future: isolated configs
-├── k8s/                    # Future: Kubernetes manifests
+├── k8s/                    # Manifests Kubernetes canônicos de publicação
 └── docs/                   # Documentation
     └── (future docs)
 ```
@@ -246,6 +246,9 @@ docker network create agenthub-shared-net
 ```
 
 ## 📚 Documentation
+
+- [Autoridade de publicação](docs/PUBLICATION_AUTHORITY.md) - fonte canônica
+  dos manifests e contrato de rollout
 
 - [Full Specification](https://github.com/AgentHub-Studio/agenthub-middleware/tree/main/docs/spec) - Complete technical spec
 - Future docs (coming soon):

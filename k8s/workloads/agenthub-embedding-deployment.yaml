@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-embedding
+  namespace: agenthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-embedding
+  template:
+    metadata:
+      labels:
+        app: agenthub-embedding
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: embedding
+          image: registry.cezar.dev/agenthub-embedding:d07708aa5caf
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 8092
+          env:
+            - name: PORT
+              value: "8092"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: POSTGRES_PASSWORD
+            - name: DB_URL
+              value: postgresql://postgres:$(POSTGRES_PASSWORD)@postgres.agenthub.svc.cluster.local:5432/agenthub
+            - name: OLLAMA_URL
+              value: http://ollama.agenthub.svc.cluster.local:11434
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-embedding
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-embedding
+  ports:
+    - port: 8092
+      targetPort: 8092
+

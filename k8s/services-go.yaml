@@ -35,6 +35,9 @@ spec:
             readOnlyRootFilesystem: true
           ports:
             - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: agenthub-api-config
           env:
             - name: PORT
               value: "8081"
@@ -48,6 +51,22 @@ spec:
                 configMapKeyRef:
                   name: agenthub-config
                   key: keycloak-url
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            - name: MCP_RUNTIME_URL
+              value: http://agenthub-mcp-client-runtime.agenthub.svc.cluster.local:8080
+            - name: MCP_RUNTIME_CLIENT_ID
+              value: agenthub-api
+            - name: MCP_RUNTIME_AUDIENCE
+              value: agenthub-mcp-client-runtime
+            - name: MCP_RUNTIME_CREDENTIAL_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: mcp-runtime-credential-encryption-key
             - name: MINIO_ENDPOINT
               valueFrom:
                 configMapKeyRef:
@@ -68,6 +87,11 @@ spec:
                 secretKeyRef:
                   name: agenthub-secrets
                   key: rabbitmq-url
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: keycloak-admin-password
             - name: LOG_LEVEL
               value: "info"
             - name: CORS_ORIGINS
@@ -80,20 +104,29 @@ spec:
               memory: "32Mi"
               cpu: "50m"
             limits:
-              memory: "128Mi"
-              cpu: "250m"
+              memory: "256Mi"
+              cpu: "500m"
           livenessProbe:
             httpGet:
               path: /health
               port: 8081
             initialDelaySeconds: 5
             periodSeconds: 15
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /health
               port: 8081
             initialDelaySeconds: 3
             periodSeconds: 10
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
@@ -106,6 +139,7 @@ spec:
   ports:
     - port: 8081
       targetPort: 8081
+  type: ClusterIP
 ---
 # agenthub-orchestrator (Go) — Fase 4 Orchestrator
 ---
@@ -325,7 +359,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: agenthub-observability
+        - name: observability
           image: registry.cezar.dev/agenthub-observability:bf8bc6b5452a
           imagePullPolicy: IfNotPresent
           securityContext:
@@ -336,6 +370,9 @@ spec:
             readOnlyRootFilesystem: true
           ports:
             - containerPort: 8086
+          envFrom:
+            - configMapRef:
+                name: agenthub-observability-config
           env:
             - name: PORT
               value: "8086"
@@ -353,7 +390,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: agenthub-secrets
-                  key: rabbitmq-url
+                  key: RABBITMQ_URL
             - name: KEYCLOAK_BASE_URL
               value: "http://keycloak.agenthub.svc.cluster.local:8080"
           resources:
@@ -369,12 +406,14 @@ spec:
               port: 8086
             initialDelaySeconds: 5
             periodSeconds: 15
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: 8086
             initialDelaySeconds: 3
             periodSeconds: 10
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
