@@ -25,7 +25,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agenthub-api
-          image: registry.cezar.dev/agenthub-api:84f4f9c5adcc
+          image: registry.cezar.dev/agenthub-api@sha256:22b0195549886e45329e2413c6189ecf2b177d990a6744bb24c28209c300c069
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -48,6 +48,22 @@ spec:
                 configMapKeyRef:
                   name: agenthub-config
                   key: keycloak-url
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            - name: MCP_RUNTIME_URL
+              value: http://agenthub-mcp-client-runtime.agenthub.svc.cluster.local:8080
+            - name: MCP_RUNTIME_CLIENT_ID
+              value: agenthub-api
+            - name: MCP_RUNTIME_AUDIENCE
+              value: agenthub-mcp-client-runtime
+            - name: MCP_RUNTIME_CREDENTIAL_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: mcp-runtime-credential-encryption-key
             - name: MINIO_ENDPOINT
               valueFrom:
                 configMapKeyRef:
