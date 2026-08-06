@@ -47,6 +47,10 @@ spec:
                 configMapKeyRef:
                   name: agenthub-config
                   key: keycloak-url
+            - name: KEYCLOAK_JWKS_URL
+              value: http://keycloak.agenthub.svc.cluster.local:8080/realms/{tenantId}/protocol/openid-connect/certs
+            - name: KEYCLOAK_ISSUER_PREFIX
+              value: https://keycloak.cezar.dev/realms/
             - name: AGENTHUB_CLIENT_ID
               value: agenthub-mcp-client-runtime
             - name: AGENTHUB_CLIENT_SECRET
