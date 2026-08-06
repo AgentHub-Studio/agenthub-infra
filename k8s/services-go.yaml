@@ -51,6 +51,11 @@ spec:
                 configMapKeyRef:
                   name: agenthub-config
                   key: keycloak-url
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: KEYCLOAK_ADMIN_PASSWORD
             - name: MCP_RUNTIME_URL
               value: http://agenthub-mcp-client-runtime.agenthub.svc.cluster.local:8080
             - name: MCP_RUNTIME_CLIENT_ID

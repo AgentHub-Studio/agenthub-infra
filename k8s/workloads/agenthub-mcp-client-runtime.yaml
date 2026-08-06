@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agenthub-mcp-client-runtime
-          image: registry.cezar.dev/agenthub-mcp-client-runtime@sha256:b1009e55c104a944322641e3bc1155a48ca5dc768d3bbb2e633e7efbac50b647
+          image: registry.cezar.dev/agenthub-mcp-client-runtime@sha256:40197eeb2a3e7ecaaba14b30fd59a559e3c4d1f2654808008ec0afa565ad2325
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -48,6 +48,10 @@ spec:
                 configMapKeyRef:
                   name: agenthub-config
                   key: keycloak-url
+            - name: KEYCLOAK_JWKS_URL
+              value: http://keycloak.agenthub.svc.cluster.local:8080/realms/{tenantId}/protocol/openid-connect/certs
+            - name: KEYCLOAK_ISSUER_PREFIX
+              value: https://keycloak.cezar.dev/realms/
             - name: AGENTHUB_CLIENT_ID
               value: agenthub-mcp-client-runtime
             - name: AGENTHUB_CLIENT_SECRET
@@ -116,4 +120,3 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-
