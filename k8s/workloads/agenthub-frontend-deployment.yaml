@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-frontend
+  namespace: agenthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-frontend
+  template:
+    metadata:
+      labels:
+        app: agenthub-frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: registry.cezar.dev/agenthub-frontend:7ce55448d88e
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 8080
+          env:
+            - name: API_BASE_URL
+              value: https://api.cezar.dev
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-frontend
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-frontend
+  ports:
+    - port: 80
+      targetPort: 8080
+

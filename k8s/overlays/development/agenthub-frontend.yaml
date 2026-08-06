@@ -1,0 +1,67 @@
+---
+# Dev deployment — ng serve with hot-reload via hostPath volume
+# Build: docker build -f Dockerfile.dev -t registry.cezar.dev/agenthub-frontend-dev:7ce55448d88e .
+#         docker push registry.cezar.dev/agenthub-frontend-dev:7ce55448d88e
+# Apply:  kubectl apply -f k8s/deployment.dev.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-frontend
+  namespace: agenthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-frontend
+  template:
+    metadata:
+      labels:
+        app: agenthub-frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: registry.cezar.dev/agenthub-frontend-dev:7ce55448d88e
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 4200
+          env:
+            - name: API_BASE_URL
+              value: https://api.cezar.dev
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: frontend-src
+              mountPath: /app/src
+      volumes:
+        - name: frontend-src
+          hostPath:
+            path: /data/desenvolvimento/agenthub-middleware/agenthub-frontend/src
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-frontend
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-frontend
+  ports:
+    - port: 4200
+      targetPort: 4200
+

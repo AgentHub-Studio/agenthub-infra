@@ -1,0 +1,98 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-extractor
+  namespace: agenthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-extractor
+  template:
+    metadata:
+      labels:
+        app: agenthub-extractor
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: extractor
+          image: registry.cezar.dev/agenthub-extractor:2e2966fb9ce2
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 8093
+          env:
+            - name: PORT
+              value: "8093"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: POSTGRES_PASSWORD
+            - name: DB_URL
+              value: postgresql://postgres:$(POSTGRES_PASSWORD)@postgres.agenthub.svc.cluster.local:5432/agenthub
+            - name: MINIO_URL
+              value: http://minio.agenthub.svc.cluster.local:9000
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: MINIO_ROOT_PASSWORD
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_HOST
+              value: rabbitmq.agenthub.svc.cluster.local
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_PORT_NUM
+              value: "5672"
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: RABBITMQ_USER
+                  optional: true
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agenthub-secrets
+                  key: RABBITMQ_PASSWORD
+                  optional: true
+            - name: RABBITMQ_QUEUE
+              value: document.uploaded
+            - name: MINIO_ENDPOINT
+              value: minio.agenthub.svc.cluster.local:9000
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-extractor
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-extractor
+  ports:
+    - port: 8093
+      targetPort: 8093
+

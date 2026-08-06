@@ -1,0 +1,25 @@
+name: Validar controlador de publicação
+
+on:
+  pull_request:
+    paths:
+      - 'k8s/**'
+      - 'k3s/**'
+      - 'scripts/validate-publication-layout.sh'
+      - '.github/workflows/publication-layout.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'k8s/**'
+      - 'k3s/**'
+      - 'scripts/validate-publication-layout.sh'
+
+jobs:
+  publication-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar origem canônica dos manifests
+        run: bash scripts/validate-publication-layout.sh
+

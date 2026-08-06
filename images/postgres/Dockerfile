@@ -1,4 +1,4 @@
-FROM docker.io/library/golang@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2 AS gosu-builder
+FROM docker.io/library/golang@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587 AS gosu-builder
 
 ARG GOSU_MODULE_VERSION="v0.0.0-20250923190938-6456aaa0f3c8"
 
@@ -7,7 +7,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 RUN set -eux; \
     GOBIN=/out CGO_ENABLED=0 go install "github.com/tianon/gosu@${GOSU_MODULE_VERSION}"; \
     /out/gosu --version; \
-    strings /out/gosu | grep -F "go1.25.11"
+    strings /out/gosu | grep -F "go1.25.12"
 
 FROM docker.io/library/postgres@sha256:cd17e2ac98240fce1541ad2a803b34009b4eea5aec8a832363cdc7eca62e722e
 
@@ -34,3 +34,5 @@ RUN set -eux; \
     gosu --version; \
     gosu nobody true; \
     postgres --version
+
+USER postgres

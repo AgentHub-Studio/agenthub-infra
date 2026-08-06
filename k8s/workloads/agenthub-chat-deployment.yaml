@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agenthub-chat
+  namespace: agenthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agenthub-chat
+  template:
+    metadata:
+      labels:
+        app: agenthub-chat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: chat
+          image: registry.cezar.dev/agenthub-chat:1c708250f07b
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AGENTHUB_BACKEND_URL
+              value: http://agenthub-api.agenthub.svc.cluster.local:8081
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agenthub-chat
+  namespace: agenthub
+spec:
+  selector:
+    app: agenthub-chat
+  ports:
+    - port: 80
+      targetPort: 8080
+

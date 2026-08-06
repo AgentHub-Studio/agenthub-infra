@@ -17,19 +17,19 @@ usage() {
 
 case "$SERVICE" in
     agenthub-api)
-        DEPLOYMENT="agenthub-api-go"
+        DEPLOYMENT="agenthub-api"
         CONTAINER="agenthub-api"
         ;;
     agenthub-orchestrator)
-        DEPLOYMENT="agenthub-orchestrator-go"
+        DEPLOYMENT="agenthub-orchestrator"
         CONTAINER="agenthub-orchestrator"
         ;;
     agenthub-skill-runtime)
-        DEPLOYMENT="agenthub-skill-runtime-go"
+        DEPLOYMENT="agenthub-skill-runtime"
         CONTAINER="agenthub-skill-runtime"
         ;;
     agenthub-observability)
-        DEPLOYMENT="agenthub-observability-go"
+        DEPLOYMENT="agenthub-observability"
         CONTAINER="agenthub-observability"
         ;;
     "")

@@ -22,15 +22,15 @@ services:
 
   postgres:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: registry.cezar.dev/agenthub-infra-postgres:76eb21cdf814
+    image: registry.cezar.dev/agenthub-infra-postgres:8b1608a36989
     pull_policy: missing
     build:
       context: .
       dockerfile: images/postgres/Dockerfile
       args:
         OCI_CREATED: ${OCI_CREATED:-2026-06-29T20:00:00Z}
-        OCI_REVISION: 76eb21cdf814153d3bc46f6b8661217686a47e1e
-        OCI_VERSION: 76eb21cdf814
+        OCI_REVISION: 8b1608a3698976bfa70d6347de1ab93d38ab2a46
+        OCI_VERSION: 8b1608a36989
         OCI_TITLE: agenthub-infra-postgres
     container_name: agenthub-postgres
     networks:
@@ -55,15 +55,15 @@ services:
 
   keycloak:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: registry.cezar.dev/agenthub-infra-keycloak:76eb21cdf814
+    image: registry.cezar.dev/agenthub-infra-keycloak:8b1608a36989
     pull_policy: missing
     build:
       context: .
       dockerfile: images/keycloak/Dockerfile
       args:
         OCI_CREATED: ${OCI_CREATED:-2026-06-29T20:00:00Z}
-        OCI_REVISION: 76eb21cdf814153d3bc46f6b8661217686a47e1e
-        OCI_VERSION: 76eb21cdf814
+        OCI_REVISION: 8b1608a3698976bfa70d6347de1ab93d38ab2a46
+        OCI_VERSION: 8b1608a36989
         OCI_TITLE: agenthub-infra-keycloak
     container_name: agenthub-keycloak
     user: "10001:10001"
@@ -149,7 +149,16 @@ services:
 
   rabbitmq:
     profiles: ["minimal", "backend", "full", "edge"]
-    image: rabbitmq:3-management
+    image: registry.cezar.dev/agenthub-infra-rabbitmq:8b1608a36989
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: images/rabbitmq/Dockerfile
+      args:
+        OCI_CREATED: ${OCI_CREATED:-2026-07-13T04:30:00Z}
+        OCI_REVISION: 8b1608a3698976bfa70d6347de1ab93d38ab2a46
+        OCI_VERSION: 8b1608a36989
+        OCI_TITLE: agenthub-infra-rabbitmq
     container_name: agenthub-rabbitmq
     networks:
       agenthub-shared-net:
@@ -161,6 +170,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   # ==========================================
@@ -353,11 +367,22 @@ services:
       agenthub-shared-net:
         aliases:
           - agenthub.mcp-client.internal
+          # The Go API resolves the canonical in-cluster service name.
+          - agenthub-mcp-client-runtime
     ports:
-      - "${MCP_CLIENT_RUNTIME_PORT:-8090}:8090"
+      - "${MCP_CLIENT_RUNTIME_PORT:-8090}:8080"
     environment:
-      PORT: 8090
-      DB_URL: ${MCP_CLIENT_RUNTIME_DB_URL:-postgresql://agenthub:changeme_secure_password@postgres.internal:5432/agenthub}
+      HTTP_PORT: "8080"
+      GRPC_PORT: "50051"
+      LOG_LEVEL: ${MCP_CLIENT_RUNTIME_LOG_LEVEL:-info}
+      AGENTHUB_BACKEND_URL: ${MCP_CLIENT_RUNTIME_BACKEND_URL:-http://agenthub.backend.internal:8081}
+      AGENTHUB_TENANT_ID: ${MCP_CLIENT_RUNTIME_TENANT_ID:-test}
+      AGENTHUB_KEYCLOAK_BASE_URL: ${MCP_CLIENT_RUNTIME_KEYCLOAK_BASE_URL:-http://keycloak.internal:8080}
+      AGENTHUB_CLIENT_ID: ${MCP_CLIENT_RUNTIME_CLIENT_ID:-agenthub-mcp-client-runtime}
+      AGENTHUB_CLIENT_SECRET: ${MCP_CLIENT_RUNTIME_CLIENT_SECRET:-}
+    depends_on:
+      - backend
+      - keycloak
     restart: unless-stopped
 
   mcp-server:
@@ -380,7 +405,16 @@ services:
 
   clickhouse:
     profiles: ["full"]
-    image: clickhouse/clickhouse-server:24.12
+    image: registry.cezar.dev/agenthub-infra-clickhouse:8b1608a36989
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: images/clickhouse/Dockerfile
+      args:
+        OCI_CREATED: ${OCI_CREATED:-2026-07-13T04:45:00Z}
+        OCI_REVISION: 8b1608a3698976bfa70d6347de1ab93d38ab2a46
+        OCI_VERSION: 8b1608a36989
+        OCI_TITLE: agenthub-infra-clickhouse
     container_name: agenthub-clickhouse
     networks:
       agenthub-shared-net:
